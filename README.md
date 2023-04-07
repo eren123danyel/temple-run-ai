@@ -1,6 +1,6 @@
 # Temple Run AI
-![Temple Run Text](https://upload.wikimedia.org/wikipedia/en/5/5c/Temple_Run_logo.png)
-![Temple Run Logo](https://play-lh.googleusercontent.com/onlNBInQHIZtB2rY24BwrEsUUKwE753ao1BAvvhOw2ePEN1IHIUjaR3gvlGd3jyKTdg=w600-h300-pc0xffffff-pd)
+![Temple Run Text](https://github.com/eren123danyel/temple-run-ai/blob/master/temple_run_text.png?raw=true)
+![Temple Run Logo](https://github.com/eren123danyel/temple-run-ai/blob/57e0f6b8b6f1b61fa8e89fff695311938323de9c/temple_run_logo.png?raw=true)
 
 An implementation of MoveNet to track a person using TensorFlow Lite, and then translate those moves to keystrokes to control an instance of temple run. 
 
