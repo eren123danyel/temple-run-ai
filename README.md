@@ -2,12 +2,12 @@
 
 A implementation of MoveNet to track a person using TensorFlow Lite, and then translate those moves to keystrokes to control an instance of temple run. 
 
-## Instalation instructions
-For windows and mac 
+## Installation instructions
+For Windows and Mac 
 ```bash
   pip install -r requirements.txt
 ```
-For Linux 
+For Linux (Additional packages needed)
 ```bash
   pip install -r requirements.txt
   sudo apt-get install scrot
