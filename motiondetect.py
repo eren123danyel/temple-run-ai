@@ -2,6 +2,7 @@
 import numpy as np
 import cv2
 import tensorflow as tf
+import pyautogui as pg
 
 # Load the tf model
 mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite")
@@ -53,10 +54,21 @@ def movenet(input_img):
     keypoints_with_scores = mnet.get_tensor(ouput_details[0]['index'])
     return keypoints_with_scores
 
+# Which key should be pressed
+def keyToPress(xmin,ymin,xmax,ymax):
+    # Get middle of bounding box
+    centerx = xmin+((xmax-xmin)/2)
+    centery = ymin+((ymax-ymin)/2)
+    #pg.press("left")
+    #pg.press("right")
+    #pg.press("up")
+    #pg.press("down")
+    return (int(centerx),int(centery))
+
 # Open window
 cv2.startWindowThread()
 
-# open webcam video stream
+# Open webcam video stream
 cap = cv2.VideoCapture(0)
 
 
@@ -87,6 +99,8 @@ while(True):
     # draw bounding box points
     cv2.rectangle(frame,kpoints_new[17][0],kpoints_new[17][1],(255,0,0),3)
 
+    # draw center
+    cv2.circle(frame,keyToPress(kpoints_new[17][0][0],kpoints_new[17][0][1],kpoints_new[17][1][0],kpoints_new[17][1][1]),10,(0,255,0),-1)
 
 
     # Display the resulting frame
