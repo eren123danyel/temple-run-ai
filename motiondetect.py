@@ -1,6 +1,5 @@
 # import the necessary packages
 import numpy as np
-from matplotlib import pyplot as plt
 import cv2
 import tensorflow as tf
 
@@ -67,22 +66,28 @@ while(True):
 
     # copy frame
     img = frame.copy()
+    
     # run through movenet
     kpoints = movenet(img)[0][0]
 
-    # Get the keypoints for the nose
-    nose_y, nose_x, nose_s = kpoints[:3]
-    nose = unnormalize(nose_x,nose_y)
+    # Split the keypoints into multiple lists
+    kpoints = [kpoints[i:i+3] for i in range(0,len(kpoints),3)]
+    kpoints_new = []
+    # Unnormalize x and y
+    i = 0
+    for l in kpoints:
+        l = list(l)
+        if (i >= 17):
+            l = [unnormalize(l[1],l[0]),unnormalize(l[2],kpoints[i+1][0]),kpoints[i+1][1]]
+            kpoints_new.append(l)
+            break
+        l = [unnormalize(l[1],l[0]),l[2]]
+        kpoints_new.append(l)
+        i+=1
+    # draw bounding box points
+    cv2.rectangle(frame,kpoints_new[17][0],kpoints_new[17][1],(255,0,0),3)
 
-    # Left eye
-    left_eye_y, left_eye_x, left_eye_s = kpoints[3:6]
-    left_eye = unnormalize(left_eye_x, left_eye_y)
 
-    # draw nose
-    cv2.circle(frame,nose,2,(0,0,255),-1)
-
-    # draw left eye
-    cv2.circle(frame,left_eye,2,(0,0,255),-1)
 
     # Display the resulting frame
     cv2.imshow('frame',frame)
