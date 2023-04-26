@@ -1,116 +1,90 @@
-# import the necessary packages
 import numpy as np
 import cv2
 import tensorflow as tf
 import pyautogui as pg
 
-# Load the tf model
+# Constants
+input_size = 192
+
+# Load the TensorFlow Lite model
 mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite")
 mnet.allocate_tensors()
 
-# Function to unnormalize coords
+
+# Function to unnormalize coordinates
 def unnormalize(posx, posy):
-    # Get the scale from diving the size of the img we are giving to movenet / frame
-    scale = 256 / 640
+    scale = input_size / 640
+    padh = (input_size - int(480 * scale)) // 2
+    padw = (input_size - int(640 * scale)) // 2
 
-    # account for padding
-    padh = (256 - int(480 * scale)) // 2
-    padw = (256 - int(640 * scale)) // 2
+    posx = (posx * input_size - padw) / scale
+    posy = (posy * input_size - padh) / scale
+    return (int(posx), int(posy))
 
-    # Calculate new pos
-    posx = (posx * 256 - padw) / scale
-    posy = (posy * 256 - padh) / scale
-    return (int(posx),int(posy))
 
 # Function to process image
 def movenet(input_img):
-    # Resize to fit model
-    input_img = tf.image.resize_with_pad(input_img,256,256)
-
-    # Expand dimension
-    input_img = tf.expand_dims(input_img,axis=0)
-
-    # Cast to usigned int
-    input_img = tf.cast(input_img,dtype=tf.uint8)
-
-    # Convert to a TensorFlow tensor
+    input_img = tf.image.resize_with_pad(input_img, input_size, input_size)
+    input_img = tf.expand_dims(input_img, axis=0)
+    input_img = tf.cast(input_img, dtype=tf.uint8)
     input_tensor = tf.convert_to_tensor(input_img)
-    
-    # Setup input and output
-    input_details = mnet.get_input_details()
-    ouput_details = mnet.get_output_details()
 
-    # Is it a dynamic input?
+    input_details = mnet.get_input_details()
+    output_details = mnet.get_output_details()
+
     is_dynamic_shape_model = input_details[0]['shape_signature'][2] == -1
     if is_dynamic_shape_model:
         input_tensor_index = input_details[0]['index']
         input_shape = input_tensor.shape
         mnet.resize_tensor_input(input_tensor_index, input_shape, strict=True)
 
-    # Make prediction
     mnet.allocate_tensors()
     mnet.set_tensor(input_details[0]['index'], input_img.numpy())
     mnet.invoke()
-    keypoints_with_scores = mnet.get_tensor(ouput_details[0]['index'])
-    return keypoints_with_scores
+    keypoints_with_scores = mnet.get_tensor(output_details[0]['index'])
 
-# Which key should be pressed
-def keyToPress(xmin,ymin,xmax,ymax):
-    # Get middle of bounding box
-    centerx = xmin+((xmax-xmin)/2)
-    centery = ymin+((ymax-ymin)/2)
-    #pg.press("left")
-    #pg.press("right")
-    #pg.press("up")
-    #pg.press("down")
-    return (int(centerx),int(centery))
+    person_index = np.argmax(keypoints_with_scores[0, :, -1])
+    keypoints = keypoints_with_scores[0, person_index]
+    keypoints = keypoints[-5:]
 
-# Open window
+    keypoints = [unnormalize(keypoints[1], keypoints[0]), unnormalize(keypoints[3], keypoints[2]), keypoints[4]]
+    return keypoints
+
+
+# Function to determine which key should be pressed
+def key_to_press(xmin, ymin, xmax, ymax):
+    centerx = xmin + ((xmax - xmin) / 2)
+    centery = ymin + ((ymax - ymin) / 2)
+    
+    if centerx <= 640 / 3:
+        print("left")
+    elif centerx <= 640 / 3 * 2:
+        print("middle")
+    else:
+        print("right")
+
+    return (int(centerx), int(centery))
+
+# Start the OpenCV window
 cv2.startWindowThread()
 
 # Open webcam video stream
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
 
-
-while(True):
-    # Capture frame-by-frame
+while True:
     ret, frame = cap.read()
-
-    # copy frame
     img = frame.copy()
-    
-    # run through movenet
-    kpoints = movenet(img)[0][0]
+    keypoints = movenet(img)
 
-    # Split the keypoints into multiple lists
-    kpoints = [kpoints[i:i+3] for i in range(0,len(kpoints),3)]
-    kpoints_new = []
-    # Unnormalize x and y
-    i = 0
-    for l in kpoints:
-        l = list(l)
-        if (i >= 17):
-            l = [unnormalize(l[1],l[0]),unnormalize(l[2],kpoints[i+1][0]),kpoints[i+1][1]]
-            kpoints_new.append(l)
-            break
-        l = [unnormalize(l[1],l[0]),l[2]]
-        kpoints_new.append(l)
-        i+=1
-    # draw bounding box points
-    cv2.rectangle(frame,kpoints_new[17][0],kpoints_new[17][1],(255,0,0),3)
+    cv2.rectangle(frame, keypoints[0], keypoints[1], (255, 0, 0), 3)
 
-    # draw center
-    cv2.circle(frame,keyToPress(kpoints_new[17][0][0],kpoints_new[17][0][1],kpoints_new[17][1][0],kpoints_new[17][1][1]),10,(0,255,0),-1)
-
-
-    # Display the resulting frame
-    cv2.imshow('frame',frame)
+    cv2.imshow('frame', frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# When everything done, release the capture
+# Release resources
 cap.release()
-
-# finally, close the window
 cv2.destroyAllWindows()
 cv2.waitKey(1)
