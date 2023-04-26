@@ -61,12 +61,14 @@ def key_to_press(centerx,centery):
     else:
         print("right")
 
-    return (int(centerx), int(centery))
+
 
 # Start the OpenCV window
 cv2.startWindowThread()
 
+
 # Open webcam video stream
+##cv2.CAP_V4L2
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
@@ -78,30 +80,27 @@ while True:
     
     frame_counter += 1
 
-    # Skip every third frame
-    if frame_counter % 3 == 0:
+    # Skip every fifth frame
+    if frame_counter % 5 == 0:
         continue
-
-    img = frame.copy()
     
-    keypoints = movenet(img)
+    keypoints = movenet(frame)
 
     # Calculate the center
-    center = np.mean(keypoints[:2], axis=0)
+    center = np.mean(keypoints[:2], axis=0).astype(int)
 
     # Calculate which part of the image you are in
     key_to_press(center[0],center[1])
     # Draw bounding box
-    cv2.circle(frame, (int(center[0]),int(center[1])), 5, (255, 0, 0), -1)
+    cv2.circle(frame, center, 5, (255, 0, 0), -1)
     
     # Show frame
     cv2.imshow('frame', frame)
 
     # If q is pressed, break the loop
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(10) & 0xFF == ord('q'):
         break
 
 # Release resources
 cap.release()
 cv2.destroyAllWindows()
-cv2.waitKey(1)
