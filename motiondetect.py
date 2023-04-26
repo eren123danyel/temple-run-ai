@@ -5,20 +5,21 @@ import pyautogui as pg
 
 # Constants
 input_size = 192
+width = 480
+height = 640
+scale = input_size / height
+pad_h = (input_size - int(width * scale)) // 2
+pad_w = (input_size - int(height * scale)) // 2
 
 # Load the TensorFlow Lite model
-mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite")
+mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite",num_threads=4)
 mnet.allocate_tensors()
 
 
 # Function to unnormalize coordinates
 def unnormalize(posx, posy):
-    scale = input_size / 640
-    padh = (input_size - int(480 * scale)) // 2
-    padw = (input_size - int(640 * scale)) // 2
-
-    posx = (posx * input_size - padw) / scale
-    posy = (posy * input_size - padh) / scale
+    posx = (posx * input_size - pad_w) / scale
+    posy = (posy * input_size - pad_h) / scale
     return (int(posx), int(posy))
 
 
@@ -52,13 +53,10 @@ def movenet(input_img):
 
 
 # Function to determine which key should be pressed
-def key_to_press(xmin, ymin, xmax, ymax):
-    centerx = xmin + ((xmax - xmin) / 2)
-    centery = ymin + ((ymax - ymin) / 2)
-    
-    if centerx <= 640 / 3:
+def key_to_press(centerx,centery):    
+    if centerx <= width / 3:
         print("left")
-    elif centerx <= 640 / 3 * 2:
+    elif centerx <= width / 3 * 2:
         print("middle")
     else:
         print("right")
@@ -70,17 +68,36 @@ cv2.startWindowThread()
 
 # Open webcam video stream
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 640)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
+
+frame_counter = 0 
 while True:
     ret, frame = cap.read()
+    
+    frame_counter += 1
+
+    # Skip every third frame
+    if frame_counter % 3 == 0:
+        continue
+
     img = frame.copy()
+    
     keypoints = movenet(img)
 
-    cv2.rectangle(frame, keypoints[0], keypoints[1], (255, 0, 0), 3)
+    # Calculate the center
+    center = np.mean(keypoints[:2], axis=0)
 
+    # Calculate which part of the image you are in
+    key_to_press(center[0],center[1])
+    # Draw bounding box
+    cv2.circle(frame, (int(center[0]),int(center[1])), 5, (255, 0, 0), -1)
+    
+    # Show frame
     cv2.imshow('frame', frame)
+
+    # If q is pressed, break the loop
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
