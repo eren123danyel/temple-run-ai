@@ -2,17 +2,19 @@ import numpy as np
 import cv2
 import tensorflow as tf
 import pyautogui as pg
+import collections
 
 # Constants
 input_size = 192
-width = 480
-height = 640
+width = 640
+height = 480
 scale = input_size / height
 pad_h = (input_size - int(width * scale)) // 2
 pad_w = (input_size - int(height * scale)) // 2
+center_buffer = collections.deque()
 
 # Load the TensorFlow Lite model
-mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite",num_threads=4)
+mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite")
 mnet.allocate_tensors()
 
 
@@ -52,19 +54,38 @@ def movenet(input_img):
     return keypoints
 
 
+
 # Function to determine which key should be pressed
-def key_to_press(centerx,centery):    
-    if centerx <= width / 3:
-        print("left")
-    elif centerx <= width / 3 * 2:
-        print("middle")
-    else:
-        print("right")
+def key_to_press(centerx,centery,buffer=5):    
+    global center_buffer
+
+    # Add the current centerx value to the buffer
+    center_buffer.append(centerx)
+    
+    # If the buffer size is exceeded, remove the oldest value
+    if len(center_buffer) > buffer:
+        center_buffer.popleft()
+
+    # Calculate the moving average of the center's x-coordinate
+    moving_avg_centerx = sum(center_buffer) / len(center_buffer)
+
+    if moving_avg_centerx <= width / 3:
+        pg.keyUp('left')
+        pg.keyDown('right')
+    elif moving_avg_centerx <= width / 3 * 2:
+        # Do nothing
+        pg.keyUp('left')
+        pg.keyUp('right')
+    elif moving_avg_centerx  >= 0:
+        pg.keyUp('right')
+        pg.keyDown('left')
 
 
 
 # Start the OpenCV window
 cv2.startWindowThread()
+cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('frame', width, height)
 
 
 # Open webcam video stream
@@ -81,7 +102,7 @@ while True:
     frame_counter += 1
 
     # Skip every fifth frame
-    if frame_counter % 5 == 0:
+    if frame_counter % 5 != 0:
         continue
     
     keypoints = movenet(frame)
@@ -91,13 +112,15 @@ while True:
 
     # Calculate which part of the image you are in
     key_to_press(center[0],center[1])
-    # Draw bounding box
+
+    # Draw the center
     cv2.circle(frame, center, 5, (255, 0, 0), -1)
+    #cv2.rectangle(frame,keypoints[0],keypoints[1],(255,0,0),2)    
     
     # Show frame
     cv2.imshow('frame', frame)
 
-    # If q is pressed, break the loop
+    # Wait 10ms and if q is pressed, break the loop
     if cv2.waitKey(10) & 0xFF == ord('q'):
         break
 
