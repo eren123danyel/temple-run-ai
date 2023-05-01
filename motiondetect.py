@@ -11,7 +11,7 @@ height = 480
 scale = input_size / height
 pad_h = (input_size - int(width * scale)) // 2
 pad_w = (input_size - int(height * scale)) // 2
-center_buffer = collections.deque()
+last_key_pressed = None
 
 # Load the TensorFlow Lite model
 mnet = tf.lite.Interpreter(model_path="lite-model_movenet_multipose_lightning_tflite_float16_1.tflite")
@@ -56,29 +56,24 @@ def movenet(input_img):
 
 
 # Function to determine which key should be pressed
-def key_to_press(centerx,centery,buffer=5):    
-    global center_buffer
-
-    # Add the current centerx value to the buffer
-    center_buffer.append(centerx)
+def key_to_press(centerx, centery, threshold=20):
+    global last_key_pressed
     
-    # If the buffer size is exceeded, remove the oldest value
-    if len(center_buffer) > buffer:
-        center_buffer.popleft()
-
-    # Calculate the moving average of the center's x-coordinate
-    moving_avg_centerx = sum(center_buffer) / len(center_buffer)
-
-    if moving_avg_centerx <= width / 3:
-        pg.keyUp('left')
-        pg.keyDown('right')
-    elif moving_avg_centerx <= width / 3 * 2:
-        # Do nothing
-        pg.keyUp('left')
-        pg.keyUp('right')
-    elif moving_avg_centerx  >= 0:
-        pg.keyUp('right')
-        pg.keyDown('left')
+    if centerx <= width / 3 - threshold:
+        if last_key_pressed != 'left':
+            pg.keyUp('right')
+            pg.keyDown('left')
+            last_key_pressed = 'left'
+    elif centerx >= width / 3 * 2 + threshold:
+        if last_key_pressed != 'right':
+            pg.keyUp('left')
+            pg.keyDown('right')
+            last_key_pressed = 'right'
+    else:
+        if last_key_pressed is not None:
+            pg.keyUp('left')
+            pg.keyUp('right')
+            last_key_pressed = None
 
 
 
