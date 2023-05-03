@@ -8,6 +8,9 @@ import pyautogui
 interpreter = tf.lite.Interpreter(model_path="lite-model_movenet_singlepose_lightning_tflite_float16_4.tflite")
 interpreter.allocate_tensors()
 
+
+# Set failsafe to false
+pyautogui.FAILSAFE = False
 # Initialize the webcam using OpenCV
 cap = cv2.VideoCapture(1)
 WIDTH = 480
@@ -19,6 +22,10 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, HEIGHT)
 PAD_H = (INPUT_SIZE - int(WIDTH * SCALE)) // 2
 PAD_W = (INPUT_SIZE - int(HEIGHT * SCALE)) // 2
 last_key_pressed = None
+
+
+def unnormalize(pos):
+    return (int((pos[0] * INPUT_SIZE - PAD_H) / SCALE), int((pos[1] * INPUT_SIZE - PAD_W) / SCALE))
 
 while True:
     # Read a frame from the webcam
@@ -45,38 +52,54 @@ while True:
     # Display the pose keypoints on the original frame using OpenCV
     keypoints = output_data[0, 0, :, :2]
     scores = output_data[0, 0, :, 2]
-    left_shoulder = keypoints[5]
-    right_shoulder = keypoints[6]
+    left_shoulder,right_shoulder = keypoints[5], keypoints[6]
+    left_ankle, right_ankle = keypoints[15],keypoints[16]
     
     if scores[5] > 0.3 and scores[6] > 0.3:
         # Unnormalize coords
-        y_left, x_left = int((left_shoulder[0] * INPUT_SIZE - PAD_H) / SCALE), int((left_shoulder[1] * INPUT_SIZE - PAD_W) / SCALE)
-        y_right, x_right = int((right_shoulder[0] * INPUT_SIZE - PAD_H) / SCALE), int((right_shoulder[1] * INPUT_SIZE - PAD_W) / SCALE)
+        y_left, x_left = unnormalize(left_shoulder)
+        y_right, x_right = unnormalize(right_shoulder)
         x_mid = (x_left + x_right) // 2
+        y_mid = (y_left + y_right) // 2
         
-        cv2.circle(frame,(int(x_mid),int(y_left)),5,(255,0,0),-1)
+        cv2.circle(frame,(int(x_mid),int(y_mid)),5,(255,0,0),-1)
 
         # Press and hold the left arrow key if the person is on the left side of the screen
         if x_mid < frame.shape[1] // 3:
-            if last_key_pressed != 'left':
-                pyautogui.keyDown('left')
-                pyautogui.keyUp('right')
-                last_key_pressed = "left"
+            last_key_pressed = "left"
         # Press and hold the right arrow key if the person is on the right side of the screen
         elif x_mid > 2 * frame.shape[1] // 3:
-            if last_key_pressed != 'right':
-                pyautogui.keyDown('right')
-                pyautogui.keyUp('left')
-                last_key_pressed = "right"
+            last_key_pressed = "right"
         # Release both arrow keys if the person is in the middle of the screen
         else:
-            if last_key_pressed is not None:
-                pyautogui.keyUp('left')
-                pyautogui.keyUp('right')
-                last_key_pressed = None
-    else:
-        pyautogui.keyUp('left')
-        pyautogui.keyUp('right')
+            last_key_pressed = None
+
+        if last_key_pressed == "left":
+            pyautogui.keyDown('left')
+            pyautogui.keyUp('right')
+        
+        elif last_key_pressed == "right":
+            pyautogui.keyDown('right')
+            pyautogui.keyUp('left')
+        else:
+            pyautogui.keyUp('left')
+            pyautogui.keyUp('right')
+
+        # Ducking logic: Press the down arrow key if person is below half of the screen
+        if y_mid > HEIGHT/2:
+            pyautogui.press('down')
+
+    ## Jumping logic
+    if scores[15] > 0.3 and scores[16] > 0.3:
+        # Unnormalize coords
+        y_left, x_left = unnormalize(left_ankle)
+        y_right, x_right = unnormalize(right_ankle)
+        y_mid = (y_left + y_right) // 2
+        # Press the up arrow key if the person is jumping 
+        if y_mid < HEIGHT-100:
+            pyautogui.press('up')
+   
+
     
     # Show the frame with pose keypoints
     cv2.imshow('frame', frame)
