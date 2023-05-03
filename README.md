@@ -6,6 +6,8 @@
 
 An implementation of MoveNet to track a person using TensorFlow Lite, and then translate those moves to keystrokes to control an instance of temple run. 
 
+**This is for an SBC running temple run, if you want to use this code, you will need to setup the game yourself**
+
 ## Installation instructions
 For Windows and Mac 
 ```bash
