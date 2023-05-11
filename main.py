@@ -5,6 +5,7 @@ import tensorflow as tf
 import pyautogui
 import http.server
 from threading import Thread
+import paho.mqtt.client as mqtt
 
 
 # make sure we are in the current dir
@@ -117,6 +118,24 @@ def main():
             cv2.destroyAllWindows()
             os._exit()
 
+def on_connect(client,userdata,flags,rc):
+    print("Sucessfully connected to MQTT")
+    client.subscribe("templerunai")
+
+def on_message(client,userdata,msg):
+    if str(msg.payload)=="b'START'":
+        # PASS Button code here
+        pass
+    
+
+def mqttServer():
+    client = mqtt.Client(client_id="PANDA",transport="websockets")
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.tls_set(ca_certs=None, certfile=None, keyfile=None)
+    client.tls_insecure_set(True)
+    client.connect(host="mqtt.nextservices.dk",port=443,keepalive=300)
+    client.loop_forever()
 
 
 if __name__ == "__main__":
@@ -124,6 +143,7 @@ if __name__ == "__main__":
     print("Website running on localhost:8000")
     Thread(target = webServer.serve_forever).start()
     Thread(target = main).start()
+    Thread(target = mqttServer).start()
     
     
     
